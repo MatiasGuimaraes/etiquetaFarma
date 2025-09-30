@@ -11,11 +11,12 @@ public class AppConfig {
     private static final String CONFIG_FILE = "config.properties";
 
     // 🔑 Credenciais do banco
-    public String dbHost = "localhost";
+    // AJUSTADO: Utilizando as credenciais do modelo Python
+    public String dbHost = "192.168.15.201";
     public String dbPorta = "5432";
-    public String dbBanco = "meu_banco";
-    public String dbUsuario = "usuario";
-    public String dbSenha = "senha";
+    public String dbBanco = "sgfpod1";
+    public String dbUsuario = "consulta";
+    public String dbSenha = "consultoria123";
 
     // 📂 Caminho padrão de saída
     public String caminhoSaida = "C:/Etiquetas";

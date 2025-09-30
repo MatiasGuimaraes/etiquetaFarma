@@ -45,20 +45,23 @@ public class PosologiaForm extends JFrame {
         try {
             String paciente = pacienteField.getText().trim();
             String posologia = posologiaArea.getText().trim();
-            String caminhoSaida = saidaField.getText().trim() + "/posologia_" + paciente + ".pdf";
+            // Correção: Obter apenas o caminho da pasta de saída
+            String pastaSaida = saidaField.getText().trim();
 
             if (paciente.isEmpty() || posologia.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Preencha todos os campos.");
                 return;
             }
 
-            new File(saidaField.getText().trim()).mkdirs();
-            PdfLabelGenerator.generateEtiquetaPosologia(paciente, posologia, caminhoSaida);
+            new File(pastaSaida).mkdirs();
+            // Correção: Passar a pasta de saída e capturar o caminho do arquivo gerado
+            String arquivoGerado = PdfLabelGenerator.generateEtiquetaPosologia(paciente, posologia, pastaSaida);
 
             // === Abre o PDF automaticamente ===
+            File pdfFile = new File(arquivoGerado);
             try {
-                if (Desktop.isDesktopSupported()) {
-                    Desktop.getDesktop().open(new File(caminhoSaida));
+                if (Desktop.isDesktopSupported() && pdfFile.exists()) {
+                    Desktop.getDesktop().open(pdfFile);
                 }
             } catch (Exception e) {
                 e.printStackTrace();

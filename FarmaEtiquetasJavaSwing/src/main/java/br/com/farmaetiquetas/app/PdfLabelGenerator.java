@@ -136,8 +136,10 @@ public class PdfLabelGenerator {
         drawLine.accept("");
 
         // Comprador / dados
-        String compradorLine = String.format("COMPRADOR: %s  RG: %s  CPF: %s  TEL: %s",
+        // AJUSTE: Renomear "CPF" para "CNPJ/CPF"
+        String compradorLine = String.format("COMPRADOR: %s  RG: %s  CNPJ/CPF: %s  TEL: %s",
                 safe(cliente), safe(RG), safe(cnpjCliente), safe(telefone));
+
         // quebra manual se muito longa (similar ao Python)
         if (compradorLine.length() <= 120) {
             drawLine.accept(compradorLine);

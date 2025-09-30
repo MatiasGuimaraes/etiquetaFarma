@@ -7,6 +7,7 @@ import java.io.File;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.text.DecimalFormat; // Import adicionado para o ajuste
 
 public class PedidoForm extends JFrame {
 
@@ -154,8 +155,27 @@ public class PedidoForm extends JFrame {
                                             }
                                         }
                                     }
-                                    // format qtd as integer
-                                    String qtdFmt = qtdStr != null ? ( (qtdStr.contains(".") ? String.valueOf((int)Double.parseDouble(qtdStr)) : qtdStr) ) : "1";
+
+                                    // AJUSTE DE FORMATAÇÃO DE QUANTIDADE
+                                    String qtdFmt = "1"; // Default value
+                                    if (qtdStr != null && !qtdStr.trim().isEmpty()) {
+                                        try {
+                                            double qtdDouble = Double.parseDouble(qtdStr);
+                                            // Verifica se é um número inteiro (ex: 2.0)
+                                            if (qtdDouble == Math.floor(qtdDouble)) {
+                                                // Formata como inteiro
+                                                qtdFmt = String.valueOf((int) qtdDouble);
+                                            } else {
+                                                // Número fracionário (ex: 2.5), formata com precisão decimal
+                                                DecimalFormat df = new DecimalFormat("#.##");
+                                                qtdFmt = df.format(qtdDouble);
+                                            }
+                                        } catch (NumberFormatException ex) {
+                                            // Se não for um número válido, usa a string original
+                                            qtdFmt = qtdStr;
+                                        }
+                                    }
+
                                     String linhaMed = String.format("%sx - %s (%s)_____________", qtdFmt, safe(nomeProd), safe(nomeLab));
                                     medicamentos.add(linhaMed);
                                 }
