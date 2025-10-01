@@ -7,7 +7,7 @@ import java.io.File;
 public class PosologiaForm extends JFrame {
 
     private final JTextField pacienteField = new JTextField();
-    private final JTextArea posologiaArea = new JTextArea(5, 20);
+    private final JTextArea posologiaArea = new JTextArea(8, 20); // Aumentado para 8 linhas
     private final JTextField saidaField = new JTextField("C:/Etiquetas");
 
     public PosologiaForm() {
@@ -45,7 +45,7 @@ public class PosologiaForm extends JFrame {
         try {
             String paciente = pacienteField.getText().trim();
             String posologia = posologiaArea.getText().trim();
-            // Correção: Obter apenas o caminho da pasta de saída
+            // CORREÇÃO: Passar apenas o caminho da pasta de saída
             String pastaSaida = saidaField.getText().trim();
 
             if (paciente.isEmpty() || posologia.isEmpty()) {
@@ -54,7 +54,7 @@ public class PosologiaForm extends JFrame {
             }
 
             new File(pastaSaida).mkdirs();
-            // Correção: Passar a pasta de saída e capturar o caminho do arquivo gerado
+            // Capturar o caminho do arquivo gerado
             String arquivoGerado = PdfLabelGenerator.generateEtiquetaPosologia(paciente, posologia, pastaSaida);
 
             // === Abre o PDF automaticamente ===

@@ -1,0 +1,12 @@
+br\com\farmaetiquetas\app\ConfigForm.class
+br\com\farmaetiquetas\app\PosologiaForm.class
+br\com\farmaetiquetas\app\PgRepository$PedidoData.class
+br\com\farmaetiquetas\app\PdfLabelGenerator.class
+br\com\farmaetiquetas\app\PedidoEtiquetaGenerator.class
+br\com\farmaetiquetas\app\PgRepository.class
+br\com\farmaetiquetas\app\AppConfig.class
+br\com\farmaetiquetas\app\MainMenu.class
+br\com\farmaetiquetas\app\util\TextWrapper.class
+br\com\farmaetiquetas\app\util\TimeUtil.class
+br\com\farmaetiquetas\app\PgRepository$Medicamento.class
+br\com\farmaetiquetas\app\PedidoForm.class

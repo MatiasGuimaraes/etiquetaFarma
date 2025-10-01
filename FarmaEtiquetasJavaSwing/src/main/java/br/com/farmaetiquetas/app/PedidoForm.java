@@ -7,7 +7,7 @@ import java.io.File;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.text.DecimalFormat; // Import adicionado para o ajuste
+import java.text.DecimalFormat;
 
 public class PedidoForm extends JFrame {
 
@@ -78,11 +78,11 @@ public class PedidoForm extends JFrame {
 
         try (Connection conn = DriverManager.getConnection(url, cfg.dbUsuario, cfg.dbSenha)) {
 
-            // 1) Busca cliente e vendedor na cadcvend
+            // 1) Busca cliente e vendedor na cadcvend - CORRIGIDO: num_nota::text
             String codCliente = null;
             String codVendedor = null;
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT cod_cliente, cod_vendedor FROM cadcvend WHERE num_nota = ?")) {
+                    "SELECT cod_cliente, cod_vendedor FROM cadcvend WHERE num_nota::text = ?")) {
                 ps.setString(1, numPedido);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
@@ -95,7 +95,7 @@ public class PedidoForm extends JFrame {
                 }
             }
 
-            // 2) Busca dados do cliente em cadclien
+            // 2) Busca dados do cliente em cadclien - CORRIGIDO: cod_cliente::text
             String nomCliente = "";
             String numCnpj = "";
             String RG = "";
@@ -104,7 +104,7 @@ public class PedidoForm extends JFrame {
             String emissor = "";
             try (PreparedStatement ps = conn.prepareStatement(
                     "SELECT nom_cliente, num_cnpj, num_ident, end_cliente, num_endereco, bai_cliente, cid_cliente, num_celular, org_emisconj, est_cliente, cep_cliente " +
-                            "FROM cadclien WHERE cod_cliente = ?")) {
+                            "FROM cadclien WHERE cod_cliente::text = ?")) {
                 ps.setString(1, codCliente);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
@@ -139,7 +139,7 @@ public class PedidoForm extends JFrame {
                         String qtdStr = rs.getString("qtd_produto");
                         // buscar nome do produto e cod_laborat em cadprodu (filtrando grupos)
                         try (PreparedStatement ps2 = conn.prepareStatement(
-                                "SELECT nom_produto, cod_laborat FROM cadprodu WHERE cod_reduzido = ? AND cod_grupo IN (86,98,99,111,102)")) {
+                                "SELECT nom_produto, cod_laborat FROM cadprodu WHERE cod_reduzido::text = ? AND cod_grupo IN (86,98,99,111,102)")) { // CORRIGIDO: CASTING
                             ps2.setString(1, codReduz);
                             try (ResultSet rs2 = ps2.executeQuery()) {
                                 if (rs2.next()) {
@@ -147,7 +147,7 @@ public class PedidoForm extends JFrame {
                                     String codLab = rs2.getString("cod_laborat");
                                     String nomeLab = "LAB. DESCONHECIDO";
                                     try (PreparedStatement ps3 = conn.prepareStatement(
-                                            "SELECT nom_laborat FROM cadlabor WHERE cod_laborat = ?")) {
+                                            "SELECT nom_laborat FROM cadlabor WHERE cod_laborat::text = ?")) { // CORRIGIDO: CASTING
                                         ps3.setString(1, codLab);
                                         try (ResultSet rs3 = ps3.executeQuery()) {
                                             if (rs3.next()) {
@@ -156,7 +156,7 @@ public class PedidoForm extends JFrame {
                                         }
                                     }
 
-                                    // AJUSTE DE FORMATAÇÃO DE QUANTIDADE
+                                    // AJUSTE DE FORMATAÇÃO DE QUANTIDADE (Trata inteiros e decimais)
                                     String qtdFmt = "1"; // Default value
                                     if (qtdStr != null && !qtdStr.trim().isEmpty()) {
                                         try {
@@ -185,10 +185,10 @@ public class PedidoForm extends JFrame {
                 }
             }
 
-            // 4) Nome do atendente (cadusuar)
+            // 4) Nome do atendente (cadusuar) - CORRIGIDO: cod_usuario::text
             String nomeAtendente = "";
             if (codVendedor != null) {
-                try (PreparedStatement ps = conn.prepareStatement("SELECT nom_apelido FROM cadusuar WHERE cod_usuario = ?")) {
+                try (PreparedStatement ps = conn.prepareStatement("SELECT nom_apelido FROM cadusuar WHERE cod_usuario::text = ?")) { // CORRIGIDO: CASTING
                     ps.setString(1, codVendedor);
                     try (ResultSet rs = ps.executeQuery()) {
                         if (rs.next()) nomeAtendente = rs.getString("nom_apelido");
@@ -224,6 +224,7 @@ public class PedidoForm extends JFrame {
     }
 
     private static String safe(String s) {
+
         return s == null ? "" : s;
     }
 
