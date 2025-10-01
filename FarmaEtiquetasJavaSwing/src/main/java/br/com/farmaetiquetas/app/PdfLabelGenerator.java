@@ -11,7 +11,7 @@ import java.util.List;
 
 public class PdfLabelGenerator {
 
-    // --- POSOLOGIA (mantido como está; carrega logo do classpath /logo.jpg) ---
+    // --- POSOLOGIA (MANTIDO EXATAMENTE COMO VOCÊ ENVIOU) ---
     public static String generateEtiquetaPosologia(String paciente, String posologia, String caminhoSaida) throws Exception {
         String nomeArquivo = "etiqueta_posologia_" + paciente.replaceAll("\\s+", "_") + "_" +
                 new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".pdf";
@@ -32,7 +32,6 @@ public class PdfLabelGenerator {
             if (logoUrl != null) {
                 Image logo = Image.getInstance(logoUrl);
                 logo.scaleToFit(90f, 30f);
-                // Posiciona o fundo da logo em yTop - 30f (Logo com 30f de altura)
                 logo.setAbsolutePosition(xLeft, yTop - 30f);
                 document.add(logo);
             } else {
@@ -42,39 +41,32 @@ public class PdfLabelGenerator {
             System.out.println("⚠️ Erro ao carregar logo: " + e.getMessage());
         }
 
-        // TELEFONE e SITE (ao lado da logo) - Ajuste nas coordenadas Y
         float textX = xLeft + 95f;
         ColumnText.showTextAligned(cb, Element.ALIGN_LEFT,
                 new Phrase("Tel: 3229-1966 / 3214-1666", new Font(Font.FontFamily.HELVETICA, 9, Font.BOLD)),
-                textX, yTop - 15f, 0); // Mover para baixo para não sobrepor o topo da logo
+                textX, yTop - 15f, 0);
         ColumnText.showTextAligned(cb, Element.ALIGN_LEFT,
                 new Phrase("www.FarmaciaModelo.com.br", new Font(Font.FontFamily.HELVETICA, 8, Font.ITALIC, BaseColor.GRAY)),
-                textX, yTop - 25f, 0); // Mover para baixo
+                textX, yTop - 25f, 0);
 
-        // PACIENTE
-        // AJUSTE: Mover Paciente para baixo para ficar abaixo da logo
         ColumnText.showTextAligned(cb, Element.ALIGN_LEFT,
                 new Phrase("Paciente: " + paciente, new Font(Font.FontFamily.HELVETICA, 11, Font.BOLD)),
-                xLeft, yTop - 40f, 0); // Mover para baixo (abaixo da área de 30f da logo)
+                xLeft, yTop - 40f, 0);
 
-        // POSOLOGIA: título + texto NA MESMA LINHA (quebra automática se necessário)
         Font tituloFont = new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD);
         Font posFont = new Font(Font.FontFamily.HELVETICA, 10, Font.NORMAL);
 
         float maxWidth = pageSize.getWidth() - 2f * xLeft;
-        // AJUSTE: Iniciar a posologia mais para baixo
-        float yPos = yTop - 60f; // Mover para baixo para compensar o ajuste do Paciente
+        float yPos = yTop - 60f;
 
         Phrase posologiaLinha = new Phrase();
         posologiaLinha.add(new Chunk("Posologia: ", tituloFont));
         posologiaLinha.add(new Chunk(posologia, posFont));
 
         ColumnText ct = new ColumnText(cb);
-        // Aumentar o espaço vertical: bottom coordinate set to 20f
         ct.setSimpleColumn(posologiaLinha, xLeft, 20f, xLeft + maxWidth, yPos, 12f, Element.ALIGN_LEFT);
         ct.go();
 
-        // RODAPÉ (data/hora)
         String data = new SimpleDateFormat("dd/MM/yyyy HH:mm").format(new Date());
         ColumnText.showTextAligned(cb, Element.ALIGN_RIGHT,
                 new Phrase(data, new Font(Font.FontFamily.HELVETICA, 7, Font.ITALIC, BaseColor.GRAY)),
@@ -84,7 +76,7 @@ public class PdfLabelGenerator {
         return arquivoSaida;
     }
 
-    // --- PRODUTO (método generateEtiquetaProduto permanece inalterado em relação à última correção) ---
+    // --- PRODUTO (REFEITO COM TUDO EM NEGRITO E COMPRESSÃO GARANTIDA) ---
     public static String generateEtiquetaProduto(String numPedido,
                                                  String cliente, String cnpjCliente, String endereco,
                                                  String RG, String telefone, String paciente, String idade,
@@ -96,93 +88,90 @@ public class PdfLabelGenerator {
         String arquivoSaida = caminhoSaida + File.separator + nomeArquivo;
 
         Rectangle pageSize = new Rectangle(100f * 2.83f, 50f * 2.83f); // ~100x50 mm
-        Document document = new Document(pageSize, 6, 6, 6, 6); // margens pequenas
+        float margin = 8f;
+        Document document = new Document(pageSize, margin, margin, margin, margin);
         PdfWriter writer = PdfWriter.getInstance(document, new FileOutputStream(arquivoSaida));
         document.open();
+
         PdfContentByte cb = writer.getDirectContent();
+        float contentWidth = pageSize.getWidth() - (margin * 2);
+        float contentHeight = pageSize.getHeight() - (margin * 2);
 
-        // desenha borda (opcional, como no reportlab)
-        cb.rectangle(2f, 2f, pageSize.getWidth() - 4f, pageSize.getHeight() - 4f);
-        cb.stroke();
+        // Usa uma fonte em negrito como base
+        Font font = new Font(Font.FontFamily.HELVETICA, 6, Font.BOLD, BaseColor.BLACK);
+        float leading = 7f;
 
-        // fonte pequena conforme Python (Helvetica 6)
-        Font f = new Font(Font.FontFamily.HELVETICA, 6, Font.NORMAL, BaseColor.BLACK);
+        // Constrói a tabela com todo o conteúdo
+        PdfPTable table = buildContentTable(font, leading, numPedido, cliente, cnpjCliente, endereco, RG, telefone, paciente, idade, medicamentos, atendente);
 
-        float x = 8f;
-        float yStart = pageSize.getHeight() - 12f;
-        float[] y = new float[]{ yStart }; // mutable container
+        // Define a largura total da tabela ANTES de qualquer outra operação.
+        table.setTotalWidth(contentWidth);
 
-        // helper para nova página
-        Runnable newPage = () -> {
-            document.newPage();
-            cb.rectangle(2f, 2f, pageSize.getWidth() - 4f, pageSize.getHeight() - 4f);
-            cb.stroke();
-            y[0] = yStart;
-        };
+        // Mede a altura real que a tabela precisa
+        float tableHeight = table.getTotalHeight();
 
-        // helper para desenhar linha com quebra de página
-        java.util.function.Consumer<String> drawLine = (text) -> {
-            if (y[0] < 12f) {
-                newPage.run();
-            }
-            ColumnText.showTextAligned(cb, Element.ALIGN_LEFT, new Phrase(text, f), x, y[0], 0);
-            y[0] -= 8f;
-        };
-
-        // Cabeçalho
-        drawLine.accept("Pedido: " + numPedido + "  " + new SimpleDateFormat("dd/MM/yyyy HH:mm").format(new Date()));
-        drawLine.accept("FARMÁCIA MODELO  -  TANEMIL FARMA LTDA  -  02.893.507/0001-47");
-        drawLine.accept("AV. REPÚBLICA DO LÍBANO, 1620, ST. OESTE, GOIÂNIA - GO, 74.115-030");
-        drawLine.accept("");
-
-        // Comprador / dados
-        // AJUSTE: Rótulo CNPJ/CPF
-        String compradorLine = String.format("COMPRADOR: %s  RG: %s  CNPJ/CPF: %s  TEL: %s",
-                safe(cliente), safe(RG), safe(cnpjCliente), safe(telefone));
-
-        // quebra manual se muito longa (similar ao Python)
-        if (compradorLine.length() <= 120) {
-            drawLine.accept(compradorLine);
-        } else {
-            // quebra por 100 chars com indent
-            int max = 100;
-            String tmp = compradorLine;
-            while (tmp.length() > max) {
-                drawLine.accept(tmp.substring(0, max));
-                tmp = "    " + tmp.substring(max);
-            }
-            if (!tmp.trim().isEmpty()) drawLine.accept(tmp);
-        }
-        drawLine.accept(safe(endereco));
-
-        // Paciente
-        drawLine.accept("PACIENTE: " + safe(paciente).toUpperCase() + "  IDADE: " + safe(idade));
-
-        // Medicamentos (cada linha, com quebra se necessário)
-        for (String med : medicamentos) {
-            String linha = med;
-            // format qtd as integer-like if possible already in string by caller
-            // quebra por 80 caracteres em caso de excesso (mantendo comportamento similar ao Python)
-            int max = 80;
-            String resto = linha;
-            while (resto.length() > max) {
-                drawLine.accept(resto.substring(0, max));
-                resto = "    " + resto.substring(max);
-            }
-            if (!resto.trim().isEmpty()) drawLine.accept(resto);
+        // Calcula o fator de compressão
+        float scale = 1.0f;
+        if (tableHeight > contentHeight) {
+            scale = contentHeight / tableHeight;
         }
 
-        drawLine.accept("");
-        drawLine.accept("_____________________                  _____________________");
-        drawLine.accept(" FARMACÊUTICO(A)                                " + safe(atendente));
-        drawLine.accept("");
-        drawLine.accept("É VEDADA A DEVOLUÇÃO DESTE(S) MEDICAMENTO(S) SEGUNDO A LEGISLAÇÃO VIGENTE.");
-        drawLine.accept("");
-        drawLine.accept("___________________________________________");
-        drawLine.accept(safe(cliente));
+        // Cria um "desenho" (template) com a altura exata do conteúdo
+        PdfTemplate template = cb.createTemplate(contentWidth, tableHeight);
+
+        // Renderiza a tabela nesse desenho (agora com a largura já definida)
+        table.writeSelectedRows(0, -1, 0, tableHeight, template);
+
+        // Adiciona o desenho ao PDF, aplicando a compressão vertical (scale)
+        float yPos = margin;
+        if (scale < 1.0f) { // Se estiver a comprimir, alinha ao topo para evitar margem extra
+            yPos = margin + (contentHeight - tableHeight * scale);
+        }
+        cb.addTemplate(template, 1, 0, 0, scale, margin, yPos);
 
         document.close();
         return arquivoSaida;
+    }
+
+    // Função que constrói a tabela de conteúdo
+    private static PdfPTable buildContentTable(Font font, float leading, String numPedido, String cliente, String cnpjCliente, String endereco, String RG, String telefone, String paciente, String idade, List<String> medicamentos, String atendente) {
+        PdfPTable table = new PdfPTable(1);
+        table.setWidthPercentage(100);
+
+        table.addCell(createCell("Pedido: " + numPedido + "  " + new SimpleDateFormat("dd/MM/yyyy HH:mm").format(new Date()), font, leading));
+        table.addCell(createCell("FARMÁCIA MODELO  -  TANEMIL FARMA LTDA  -  02.893.507/0001-47", font, leading));
+        table.addCell(createCell("AV. REPÚBLICA DO LÍBANO, 1620, ST. OESTE, GOIÂNIA - GO, 74.115-030", font, leading));
+        table.addCell(createCell(" ", font, leading / 2));
+
+        String compradorLine = String.format("COMPRADOR: %s  RG: %s  CNPJ/CPF: %s  TEL: %s",
+                safe(cliente), safe(RG), safe(cnpjCliente), safe(telefone));
+        table.addCell(createCell(compradorLine, font, leading));
+        table.addCell(createCell(safe(endereco), font, leading));
+        table.addCell(createCell("PACIENTE: " + safe(paciente).toUpperCase() + "  IDADE: " + safe(idade), font, leading));
+
+        for (String med : medicamentos) {
+            table.addCell(createCell(med, font, leading));
+        }
+
+        table.addCell(createCell(" ", font, leading / 2));
+        table.addCell(createCell("_____________________            _____________________", font, leading));
+        table.addCell(createCell(" FARMACÊUTICO(A)                       " + safe(atendente), font, leading));
+        table.addCell(createCell(" ", font, leading / 2));
+        table.addCell(createCell("É VEDADA A DEVOLUÇÃO DESTE(S) MEDICAMENTO(S) SEGUNDO A LEGISLAÇÃO VIGENTE.", font, leading));
+        table.addCell(createCell(" ", font, leading / 2));
+        table.addCell(createCell("___________________________________________", font, leading));
+        table.addCell(createCell(safe(cliente), font, leading));
+
+        return table;
+    }
+
+    // Helper para criar células de tabela
+    private static PdfPCell createCell(String text, Font font, float leading) {
+        Paragraph p = new Paragraph(text, font);
+        p.setLeading(leading);
+        PdfPCell cell = new PdfPCell(p);
+        cell.setBorder(Rectangle.NO_BORDER);
+        return cell;
     }
 
     private static String safe(String s) {
