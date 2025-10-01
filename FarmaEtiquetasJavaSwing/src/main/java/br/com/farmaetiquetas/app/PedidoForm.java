@@ -128,10 +128,10 @@ public class PedidoForm extends JFrame {
                 }
             }
 
-            // 3) Produtos do pedido (cadivend)
+            // 3) Produtos do pedido (cadivend) - CORRIGIDO: num_nota::text
             List<String> medicamentos = new ArrayList<>();
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT cod_reduzido, qtd_produto FROM cadivend WHERE num_nota = ? AND (flg_excluido = '' OR flg_excluido IS NULL)")) {
+                    "SELECT cod_reduzido, qtd_produto FROM cadivend WHERE num_nota::text = ? AND (flg_excluido = '' OR flg_excluido IS NULL)")) {
                 ps.setString(1, numPedido);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
