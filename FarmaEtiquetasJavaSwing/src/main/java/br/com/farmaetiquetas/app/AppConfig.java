@@ -11,11 +11,11 @@ public class AppConfig {
     private static final String CONFIG_FILE = "config.properties";
 
     // --- BANCO DE DADOS (Atualizado com dados do TesteConexao) ---
-    public String dbHost = "192.168.15.201";
-    public String dbPorta = "5432";
-    public String dbBanco = "sgfpod1";
-    public String dbUsuario = "consulta";
-    public String dbSenha = "consultoria123";
+    public String dbHost = "host";
+    public String dbPorta = "porta";
+    public String dbBanco = "banco";
+    public String dbUsuario = "usuario";
+    public String dbSenha = "senha";
 
     // Caminho de saída
     public String caminhoSaida = "C:/Etiquetas";
