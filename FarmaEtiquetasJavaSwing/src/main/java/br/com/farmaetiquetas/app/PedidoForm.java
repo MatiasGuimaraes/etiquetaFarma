@@ -103,7 +103,7 @@ public class PedidoForm extends JFrame {
             String telefone = "";
             String emissor = "";
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT nom_cliente, num_cnpj, num_ident, end_cliente, num_endereco, bai_cliente, cid_cliente, num_celular, org_emisconj, est_cliente, cep_cliente " +
+                    "SELECT nom_cliente, num_cnpj, num_ident, end_cliente, num_endereco, bai_cliente, cid_cliente, num_celular, org_emissor, est_emissor, est_cliente, cep_cliente " +
                             "FROM cadclien WHERE cod_cliente::text = ?")) {
                 ps.setString(1, codCliente);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -120,7 +120,18 @@ public class PedidoForm extends JFrame {
                         endereco = String.format("%s, %s, %s - %s-%s %s",
                                 safe(e1), safe(e2), safe(e3), safe(cidade), safe(estado), safe(cep));
                         telefone = rs.getString("num_celular");
-                        emissor = rs.getString("org_emisconj");
+                        String org = rs.getString("org_emissor");
+                        String ufEmissor = rs.getString("est_emissor");
+
+                        emissor =safe(org);
+
+                        if (ufEmissor != null && !ufEmissor.trim().isEmpty()){
+                            if(!emissor.isEmpty()){
+                                emissor += "/" + ufEmissor.trim();
+                            } else {
+                                emissor = ufEmissor;
+                            }
+                        }
                     } else {
                         JOptionPane.showMessageDialog(this, "Cliente não encontrado (cadclien).");
                         return;

@@ -10,15 +10,18 @@ public class AppConfig {
 
     private static final String CONFIG_FILE = "config.properties";
 
-    // banco de dados
-    public String dbHost = "Host";
-    public String dbPorta = "Porta";
-    public String dbBanco = "NomeDoBanco";
-    public String dbUsuario = "User";
-    public String dbSenha = "Senha";
+    // --- BANCO DE DADOS (Atualizado com dados do TesteConexao) ---
+    public String dbHost = "192.168.15.201";
+    public String dbPorta = "5432";
+    public String dbBanco = "sgfpod1";
+    public String dbUsuario = "consulta";
+    public String dbSenha = "consultoria123";
 
     // Caminho de saída
     public String caminhoSaida = "C:/Etiquetas";
+
+    // Impressora (Mantido para compatibilidade com o código anterior)
+    public String nomeImpressora = "Nome_Da_Impressora_Aqui";
 
     /**
      * Carrega as configurações do arquivo config.properties
@@ -28,16 +31,18 @@ public class AppConfig {
             Properties prop = new Properties();
             prop.load(input);
 
+            // Se existirem valores no arquivo, eles sobrescrevem os padrões acima
             dbHost = prop.getProperty("dbHost", dbHost);
             dbPorta = prop.getProperty("dbPorta", dbPorta);
             dbBanco = prop.getProperty("dbBanco", dbBanco);
             dbUsuario = prop.getProperty("dbUsuario", dbUsuario);
             dbSenha = prop.getProperty("dbSenha", dbSenha);
             caminhoSaida = prop.getProperty("caminhoSaida", caminhoSaida);
+            nomeImpressora = prop.getProperty("nomeImpressora", nomeImpressora);
 
             System.out.println("✅ Configurações carregadas de " + CONFIG_FILE);
         } catch (Exception e) {
-            System.out.println("⚠️ Não foi possível carregar " + CONFIG_FILE + ". Usando valores padrão.");
+            System.out.println("⚠️ Não foi possível carregar " + CONFIG_FILE + ". Usando valores padrão (hardcoded).");
         }
     }
 
@@ -54,6 +59,7 @@ public class AppConfig {
             prop.setProperty("dbUsuario", dbUsuario);
             prop.setProperty("dbSenha", dbSenha);
             prop.setProperty("caminhoSaida", caminhoSaida);
+            prop.setProperty("nomeImpressora", nomeImpressora);
 
             prop.store(output, "Configurações do FarmaEtiquetas");
             System.out.println("💾 Configurações salvas em " + CONFIG_FILE);
