@@ -1,245 +1,333 @@
 package br.com.farmaetiquetas.app;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
+import java.awt.geom.RoundRectangle2D;
+import java.io.BufferedReader;
 import java.io.File;
-import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.text.DecimalFormat;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 
 public class PedidoForm extends JFrame {
 
-    private final JTextField pedidoField = new JTextField();
-    private final JTextField pacienteField = new JTextField();
-    private final JTextField idadeField = new JTextField();
-    private final JTextField saidaField = new JTextField("C:/Etiquetas");
+    private static final Color AZUL       = new Color(26, 82, 160);
+    private static final Color AZUL_HOVER = new Color(20, 65, 135);
+    private static final Color FUNDO      = new Color(240, 242, 247);
+    private static final Color CAMPO_BG   = new Color(248, 249, 252);
+    private static final Color BORDA      = new Color(210, 215, 225);
+    private static final Color LABEL_COR  = new Color(60, 70, 90);
 
-    public PedidoForm() {
-        super("Gerador de Etiqueta - Pedido (BD)");
+    private final CampoTexto pedidoField   = new CampoTexto();
+    private final CampoTexto pacienteField = new CampoTexto();
+    private final CampoTexto idadeField    = new CampoTexto();
+    private final CampoTexto saidaField    = new CampoTexto();
+
+    private final AppConfig config;
+
+    public PedidoForm(AppConfig config) {
+        super("Gerador de Etiqueta - Pedido");
+        this.config = config;
+
+        saidaField.setText("C:/Etiquetas");
+
         setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-        setSize(520, 260);
+        setSize(500, 580);
         setLocationRelativeTo(null);
+        setResizable(false);
+        getContentPane().setBackground(FUNDO);
         setLayout(new BorderLayout());
 
-        JPanel form = new JPanel(new GridBagLayout());
+        // Header azul
+        JPanel header = new JPanel(new BorderLayout());
+        header.setBackground(AZUL);
+        header.setBorder(new EmptyBorder(16, 22, 16, 22));
+
+        JLabel lblTitulo = new JLabel("GERADOR DE ETIQUETA - PEDIDO");
+        lblTitulo.setFont(new Font("SansSerif", Font.BOLD, 14));
+        lblTitulo.setForeground(Color.WHITE);
+
+        JLabel lblSub = new JLabel("Busca dados do pedido via API");
+        lblSub.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        lblSub.setForeground(new Color(180, 210, 255));
+
+        JPanel headerTxt = new JPanel(new GridLayout(2, 1, 0, 2));
+        headerTxt.setOpaque(false);
+        headerTxt.add(lblTitulo);
+        headerTxt.add(lblSub);
+
+        // Icone prancheta
+        JPanel iconeHeader = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int cx = getWidth() / 2, cy = getHeight() / 2;
+                g2.setColor(new Color(255, 255, 255, 50));
+                g2.fillOval(cx - 18, cy - 18, 36, 36);
+                g2.setColor(new Color(255, 255, 255, 200));
+                g2.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawRoundRect(cx - 9, cy - 10, 18, 20, 3, 3);
+                g2.drawRoundRect(cx - 4, cy - 13, 8, 5, 2, 2);
+                g2.drawLine(cx - 5, cy - 3, cx + 5, cy - 3);
+                g2.drawLine(cx - 5, cy + 2, cx + 5, cy + 2);
+                g2.drawLine(cx - 5, cy + 7, cx + 2, cy + 7);
+                g2.dispose();
+            }
+            @Override public Dimension getPreferredSize() { return new Dimension(48, 48); }
+        };
+        iconeHeader.setOpaque(false);
+        header.add(headerTxt, BorderLayout.CENTER);
+        header.add(iconeHeader, BorderLayout.EAST);
+        add(header, BorderLayout.NORTH);
+
+        // Card branco arredondado
+        JPanel card = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(Color.WHITE);
+                g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 18, 18));
+                g2.dispose();
+            }
+        };
+        card.setOpaque(false);
+        card.setLayout(new GridBagLayout());
+        card.setBorder(new EmptyBorder(24, 28, 24, 28));
+
         GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(6, 6, 6, 6);
         c.fill = GridBagConstraints.HORIZONTAL;
+        c.weightx = 1.0;
+        c.gridx = 0;
 
-        int y = 0;
-        c.gridx = 0; c.gridy = y; form.add(new JLabel("Número do Pedido:"), c);
-        c.gridx = 1; c.weightx = 1.0; form.add(pedidoField, c);
-        y++;
+        c.gridy = 0; c.insets = new Insets(0, 0, 5, 0);
+        card.add(label("Numero do Pedido:"), c);
+        c.gridy = 1; c.insets = new Insets(0, 0, 14, 0);
+        card.add(pedidoField, c);
 
-        c.gridx = 0; c.gridy = y; form.add(new JLabel("Nome do Paciente:"), c);
-        c.gridx = 1; form.add(pacienteField, c);
-        y++;
+        c.gridy = 2; c.insets = new Insets(0, 0, 5, 0);
+        card.add(label("Nome do Paciente:"), c);
+        c.gridy = 3; c.insets = new Insets(0, 0, 14, 0);
+        card.add(pacienteField, c);
 
-        c.gridx = 0; c.gridy = y; form.add(new JLabel("Idade do Paciente:"), c);
-        c.gridx = 1; form.add(idadeField, c);
-        y++;
+        c.gridy = 4; c.insets = new Insets(0, 0, 5, 0);
+        card.add(label("Idade do Paciente:"), c);
+        c.gridy = 5; c.insets = new Insets(0, 0, 14, 0);
+        card.add(idadeField, c);
 
-        c.gridx = 0; c.gridy = y; form.add(new JLabel("Saída (pasta):"), c);
-        c.gridx = 1; form.add(saidaField, c);
-        y++;
+        c.gridy = 6; c.insets = new Insets(0, 0, 5, 0);
+        card.add(label("Pasta de Saida:"), c);
+        c.gridy = 7; c.insets = new Insets(0, 0, 22, 0);
+        card.add(saidaField, c);
 
-        JButton gerar = new JButton("Buscar no BD e Gerar Etiqueta");
-        gerar.addActionListener(this::onGerar);
-        add(form, BorderLayout.CENTER);
-        add(gerar, BorderLayout.SOUTH);
+        BotaoRound btnGerar = new BotaoRound("BUSCAR NA API E GERAR ETIQUETA", AZUL, AZUL_HOVER);
+        btnGerar.addActionListener(this::onGerar);
+        c.gridy = 8; c.insets = new Insets(0, 0, 10, 0);
+        card.add(btnGerar, c);
+
+        // Link configuracoes
+        JLabel lblConfig = new JLabel("Gerenciar Configuracoes", SwingConstants.CENTER);
+        lblConfig.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        lblConfig.setForeground(new Color(100, 120, 160));
+        lblConfig.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        lblConfig.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent e) { ConfigForm.open(config); }
+            public void mouseEntered(java.awt.event.MouseEvent e) { lblConfig.setForeground(AZUL); }
+            public void mouseExited(java.awt.event.MouseEvent e)  { lblConfig.setForeground(new Color(100, 120, 160)); }
+        });
+        c.gridy = 9; c.insets = new Insets(0, 0, 0, 0);
+        card.add(lblConfig, c);
+
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setBackground(FUNDO);
+        wrapper.setBorder(new EmptyBorder(18, 18, 18, 18));
+        wrapper.add(card, BorderLayout.CENTER);
+        add(wrapper, BorderLayout.CENTER);
+    }
+
+    private JLabel label(String txt) {
+        JLabel l = new JLabel(txt);
+        l.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        l.setForeground(LABEL_COR);
+        return l;
     }
 
     private void onGerar(ActionEvent e) {
-        String numPedido = pedidoField.getText().trim();
-        String paciente = pacienteField.getText().trim();
-        String idade = idadeField.getText().trim();
+        String numPedido  = pedidoField.getText().trim();
+        String paciente   = pacienteField.getText().trim();
+        String idade      = idadeField.getText().trim();
         String pastaSaida = saidaField.getText().trim();
 
-        if (numPedido.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Digite o número do pedido.");
-            return;
+        if (numPedido.isEmpty()) { JOptionPane.showMessageDialog(this, "Digite o numero do pedido."); return; }
+        if (paciente.isEmpty())  { JOptionPane.showMessageDialog(this, "Digite o nome do paciente."); return; }
+        if (idade.isEmpty())     { JOptionPane.showMessageDialog(this, "Digite a idade do paciente."); return; }
+
+        if (config.apiUrl == null || config.apiUrl.trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "URL da API nao configurada."); return;
         }
-        if (paciente.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Digite o nome do paciente.");
-            return;
-        }
-        if (idade.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Digite a idade do paciente.");
-            return;
+        if (config.apiKey == null || config.apiKey.trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "API Key nao configurada."); return;
         }
 
-        // Carrega configuração do DB
-        AppConfig cfg = new AppConfig();
-        cfg.carregar(); // garante que dbHost/dbPorta/dbBanco/dbUsuario/dbSenha estejam preenchidos
+        try {
+            // 1. FAZ O GET: Busca os dados do pedido no banco de dados
+            URL urlGet = new URL(config.apiUrl + "/api/pedidos/buscar/" + numPedido);
+            HttpURLConnection conexaoGet = (HttpURLConnection) urlGet.openConnection();
+            conexaoGet.setRequestMethod("GET");
+            conexaoGet.setRequestProperty("Accept", "application/json");
+            conexaoGet.setRequestProperty("X-API-KEY", config.apiKey);
+            conexaoGet.setConnectTimeout(10000);
+            conexaoGet.setReadTimeout(30000);
 
-        String url = "jdbc:postgresql://" + cfg.dbHost + ":" + cfg.dbPorta + "/" + cfg.dbBanco;
+            int statusGet = conexaoGet.getResponseCode();
+            if (statusGet == 401) { JOptionPane.showMessageDialog(this, "Acesso negado. Verifique a API Key."); return; }
+            if (statusGet == 404) { JOptionPane.showMessageDialog(this, "Pedido nao encontrado no banco de dados."); return; }
+            if (statusGet != 200) { JOptionPane.showMessageDialog(this, "Erro na API. Codigo: " + statusGet); return; }
 
-        try (Connection conn = DriverManager.getConnection(url, cfg.dbUsuario, cfg.dbSenha)) {
+            // Lê o JSON que a API devolveu
+            BufferedReader in = new BufferedReader(new InputStreamReader(conexaoGet.getInputStream(), StandardCharsets.UTF_8));
+            StringBuilder content = new StringBuilder();
+            String inputLine;
+            while ((inputLine = in.readLine()) != null) content.append(inputLine);
+            in.close();
 
-            // 1) Busca cliente e vendedor na cadcvend - CORRIGIDO: num_nota::text
-            String codCliente = null;
-            String codVendedor = null;
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT cod_cliente, cod_vendedor FROM cadcvend WHERE num_nota::text = ?")) {
-                ps.setString(1, numPedido);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        codCliente = rs.getString("cod_cliente");
-                        codVendedor = rs.getString("cod_vendedor");
-                    } else {
-                        JOptionPane.showMessageDialog(this, "Pedido não encontrado (cadcvend).");
-                        return;
-                    }
-                }
+            // 2. INJETA OS DADOS DA TELA NO JSON
+            JSONObject json = new JSONObject(content.toString());
+            json.put("paciente", paciente); // Adiciona o nome que foi digitado
+            json.put("idade", idade);       // Adiciona a idade que foi digitada
+
+            json.put("numero", numPedido);
+
+            // 3. FAZ O POST: Manda o JSON completo de volta pedindo o PDF
+            URL urlPost = new URL(config.apiUrl + "/api/pedidos/gerar-etiqueta");
+            HttpURLConnection conexaoPost = (HttpURLConnection) urlPost.openConnection();
+            conexaoPost.setRequestMethod("POST");
+            conexaoPost.setRequestProperty("Content-Type", "application/json");
+            conexaoPost.setRequestProperty("Accept", "application/pdf");
+            conexaoPost.setRequestProperty("X-API-KEY", config.apiKey);
+            conexaoPost.setDoOutput(true);
+
+            // Escreve o JSON no corpo da requisição
+            try (java.io.OutputStream os = conexaoPost.getOutputStream()) {
+                os.write(json.toString().getBytes(StandardCharsets.UTF_8));
             }
 
-            // 2) Busca dados do cliente em cadclien - CORRIGIDO: cod_cliente::text
-            String nomCliente = "";
-            String numCnpj = "";
-            String RG = "";
-            String endereco = "";
-            String telefone = "";
-            String emissor = "";
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT nom_cliente, num_cnpj, num_ident, end_cliente, num_endereco, bai_cliente, cid_cliente, num_celular, org_emissor, est_emissor, est_cliente, cep_cliente " +
-                            "FROM cadclien WHERE cod_cliente::text = ?")) {
-                ps.setString(1, codCliente);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        nomCliente = rs.getString("nom_cliente");
-                        numCnpj = rs.getString("num_cnpj");
-                        RG = rs.getString("num_ident");
-                        String e1 = rs.getString("end_cliente");
-                        String e2 = rs.getString("num_endereco");
-                        String e3 = rs.getString("bai_cliente");
-                        String cidade = rs.getString("cid_cliente");
-                        String estado = rs.getString("est_cliente");
-                        String cep = rs.getString("cep_cliente");
-                        endereco = String.format("%s, %s, %s - %s-%s %s",
-                                safe(e1), safe(e2), safe(e3), safe(cidade), safe(estado), safe(cep));
-                        telefone = rs.getString("num_celular");
-                        String org = rs.getString("org_emissor");
-                        String ufEmissor = rs.getString("est_emissor");
+            // 4. RECEBE O PDF E SALVA NA MÁQUINA
+            int statusPost = conexaoPost.getResponseCode();
+            if (statusPost == 200) {
+                new File(pastaSaida).mkdirs();
+                File pdfFile = new File(pastaSaida, "etiqueta_pedido_" + numPedido + ".pdf");
 
-                        emissor =safe(org);
-
-                        if (ufEmissor != null && !ufEmissor.trim().isEmpty()){
-                            if(!emissor.isEmpty()){
-                                emissor += "/" + ufEmissor.trim();
-                            } else {
-                                emissor = ufEmissor;
-                            }
-                        }
-                    } else {
-                        JOptionPane.showMessageDialog(this, "Cliente não encontrado (cadclien).");
-                        return;
+                // Faz o download dos bytes e salva como arquivo físico
+                try (java.io.InputStream is = conexaoPost.getInputStream();
+                     java.io.FileOutputStream fos = new java.io.FileOutputStream(pdfFile)) {
+                    byte[] buffer = new byte[4096];
+                    int bytesRead;
+                    while ((bytesRead = is.read(buffer)) != -1) {
+                        fos.write(buffer, 0, bytesRead);
                     }
                 }
-            }
 
-            // 3) Produtos do pedido (cadivend) - CORRIGIDO: num_nota::text
-            List<String> medicamentos = new ArrayList<>();
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT cod_reduzido, qtd_produto FROM cadivend WHERE num_nota::text = ? AND (flg_excluido = '' OR flg_excluido IS NULL)")) {
-                ps.setString(1, numPedido);
-                try (ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        String codReduz = rs.getString("cod_reduzido");
-                        String qtdStr = rs.getString("qtd_produto");
-                        // buscar nome do produto e cod_laborat em cadprodu (filtrando grupos)
-                        try (PreparedStatement ps2 = conn.prepareStatement(
-                                "SELECT nom_produto, cod_laborat FROM cadprodu WHERE cod_reduzido::text = ? AND cod_grupo IN (86,98,99,111,102)")) { // CORRIGIDO: CASTING
-                            ps2.setString(1, codReduz);
-                            try (ResultSet rs2 = ps2.executeQuery()) {
-                                if (rs2.next()) {
-                                    String nomeProd = rs2.getString("nom_produto");
-                                    String codLab = rs2.getString("cod_laborat");
-                                    String nomeLab = "LAB. DESCONHECIDO";
-                                    try (PreparedStatement ps3 = conn.prepareStatement(
-                                            "SELECT nom_laborat FROM cadlabor WHERE cod_laborat::text = ?")) { // CORRIGIDO: CASTING
-                                        ps3.setString(1, codLab);
-                                        try (ResultSet rs3 = ps3.executeQuery()) {
-                                            if (rs3.next()) {
-                                                nomeLab = rs3.getString("nom_laborat");
-                                            }
-                                        }
-                                    }
-
-                                    // AJUSTE DE FORMATAÇÃO DE QUANTIDADE (Trata inteiros e decimais)
-                                    String qtdFmt = "1"; // Default value
-                                    if (qtdStr != null && !qtdStr.trim().isEmpty()) {
-                                        try {
-                                            double qtdDouble = Double.parseDouble(qtdStr);
-                                            // Verifica se é um número inteiro (ex: 2.0)
-                                            if (qtdDouble == Math.floor(qtdDouble)) {
-                                                // Formata como inteiro
-                                                qtdFmt = String.valueOf((int) qtdDouble);
-                                            } else {
-                                                // Número fracionário (ex: 2.5), formata com precisão decimal
-                                                DecimalFormat df = new DecimalFormat("#.##");
-                                                qtdFmt = df.format(qtdDouble);
-                                            }
-                                        } catch (NumberFormatException ex) {
-                                            // Se não for um número válido, usa a string original
-                                            qtdFmt = qtdStr;
-                                        }
-                                    }
-
-                                    String linhaMed = String.format("%sx - %s (%s)_____________", qtdFmt, safe(nomeProd), safe(nomeLab));
-                                    medicamentos.add(linhaMed);
-                                }
-                            }
-                        } // ps2 closed
-                    }
-                }
-            }
-
-            // 4) Nome do atendente (cadusuar) - CORRIGIDO: cod_usuario::text
-            String nomeAtendente = "";
-            if (codVendedor != null) {
-                try (PreparedStatement ps = conn.prepareStatement("SELECT nom_apelido FROM cadusuar WHERE cod_usuario::text = ?")) { // CORRIGIDO: CASTING
-                    ps.setString(1, codVendedor);
-                    try (ResultSet rs = ps.executeQuery()) {
-                        if (rs.next()) nomeAtendente = rs.getString("nom_apelido");
-                    }
-                }
-            }
-
-            // --- chama o gerador (mantendo layout semelhante ao Python) ---
-            new File(pastaSaida).mkdirs();
-            String arquivoGerado = PdfLabelGenerator.generateEtiquetaProduto(
-                    numPedido, nomCliente, numCnpj, endereco, RG, telefone, paciente, idade,
-                    medicamentos, nomeAtendente, emissor, pastaSaida
-            );
-
-            // abre automaticamente
-            File pdfFile = new File(arquivoGerado);
-            if (Desktop.isDesktopSupported() && pdfFile.exists()) {
-                try {
+                // Abre o PDF na tela!
+                if (Desktop.isDesktopSupported() && pdfFile.exists()) {
                     Desktop.getDesktop().open(pdfFile);
-                } catch (Exception exOpen) {
-                    JOptionPane.showMessageDialog(this, "Etiqueta gerada, mas não foi possível abrir automaticamente.\nArquivo: " + pdfFile.getAbsolutePath());
                 }
-            } else {
-                JOptionPane.showMessageDialog(this, "Etiqueta gerada em: " + pdfFile.getAbsolutePath());
-            }
 
-            JOptionPane.showMessageDialog(this, "Etiqueta de produto gerada com sucesso!");
+            } else {
+                JOptionPane.showMessageDialog(this, "Erro ao gerar PDF na API. Codigo: " + statusPost);
+            }
 
         } catch (Exception ex) {
             ex.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Erro ao buscar dados / gerar etiqueta:\n" + ex.getMessage());
+            JOptionPane.showMessageDialog(this, "Erro de Conexão: " + ex.getMessage());
         }
     }
 
-    private static String safe(String s) {
+    // Campo texto arredondado — modificado para resolver esmagamento no macOS
+    static class CampoTexto extends JPanel {
+        private final JTextField field = new JTextField();
+        private boolean foc = false;
 
-        return s == null ? "" : s;
+        CampoTexto() {
+            setLayout(new BorderLayout());
+            setOpaque(false);
+            setPreferredSize(new Dimension(0, 44));
+
+            // O segredo para o Mac não espremer o texto:
+            field.setOpaque(false);
+            field.setBackground(new Color(0, 0, 0, 0)); // Força a transparência absoluta no macOS
+
+            // Margens verticais aplicadas para centralizar o texto e evitar o corte
+            field.setBorder(new EmptyBorder(10, 12, 10, 12));
+
+            field.setFont(new Font("SansSerif", Font.PLAIN, 14)); // Fonte ajustada
+            field.setForeground(new Color(30, 40, 60));
+            field.addFocusListener(new FocusAdapter() {
+                public void focusGained(FocusEvent e) { foc = true;  repaint(); }
+                public void focusLost(FocusEvent e)   { foc = false; repaint(); }
+            });
+            add(field, BorderLayout.CENTER);
+        }
+
+        @Override protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(CAMPO_BG);
+            g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
+            g2.setColor(foc ? AZUL : BORDA);
+            g2.setStroke(new BasicStroke(foc ? 1.8f : 1.2f));
+            g2.draw(new RoundRectangle2D.Float(0.5f, 0.5f, getWidth() - 1, getHeight() - 1, 10, 10));
+            g2.dispose();
+            super.paintComponent(g);
+        }
+
+        public String getText() { return field.getText(); }
+        public void setText(String t) { field.setText(t); }
     }
 
-    public static void open() {
-        new PedidoForm().setVisible(true);
+    // Botao arredondado reutilizavel
+    public static class BotaoRound extends JButton {
+        private final Color corBase;
+        private final Color corHover;
+        private boolean hover = false;
+
+        public BotaoRound(String texto, Color corBase, Color corHover) {
+            super(texto);
+            this.corBase  = corBase;
+            this.corHover = corHover;
+            setOpaque(false);
+            setContentAreaFilled(false);
+            setBorderPainted(false);
+            setFocusPainted(false);
+            setForeground(Color.WHITE);
+            setFont(new Font("SansSerif", Font.BOLD, 13));
+            setCursor(new Cursor(Cursor.HAND_CURSOR));
+            setPreferredSize(new Dimension(0, 46));
+            addMouseListener(new java.awt.event.MouseAdapter() {
+                public void mouseEntered(java.awt.event.MouseEvent e) { hover = true;  repaint(); }
+                public void mouseExited(java.awt.event.MouseEvent e)  { hover = false; repaint(); }
+            });
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(hover ? corHover : corBase);
+            g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
+            super.paintComponent(g);
+            g2.dispose();
+        }
+    }
+
+    public static void open(AppConfig config) {
+        new PedidoForm(config).setVisible(true);
     }
 }

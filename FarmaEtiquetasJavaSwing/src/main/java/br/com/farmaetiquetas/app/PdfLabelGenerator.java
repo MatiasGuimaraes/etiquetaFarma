@@ -15,20 +15,25 @@ import java.io.FileInputStream;
 
 public class PdfLabelGenerator {
 
-    // --- POSOLOGIA (MANTIDO) ---
+    // Dimensoes da etiqueta em pontos (100x50mm)
+    private static final float PAGE_W = 100f * 2.83f;
+    private static final float PAGE_H = 50f  * 2.83f;
+    private static final float MARGIN = 8f;
+
+    // --- POSOLOGIA ---
     public static String generateEtiquetaPosologia(String paciente, String posologia, String caminhoSaida) throws Exception {
         String nomeArquivo = "etiqueta_posologia_" + paciente.replaceAll("\\s+", "_") + "_" +
                 new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".pdf";
         String arquivoSaida = caminhoSaida + File.separator + nomeArquivo;
 
-        Rectangle pageSize = new Rectangle(100f * 2.83f, 50f * 2.83f); // ~100x50mm
+        Rectangle pageSize = new Rectangle(PAGE_W, PAGE_H);
         Document document = new Document(pageSize, 10, 10, 10, 10);
         PdfWriter writer = PdfWriter.getInstance(document, new FileOutputStream(arquivoSaida));
         document.open();
         PdfContentByte cb = writer.getDirectContent();
 
         float xLeft = 10f;
-        float yTop = pageSize.getHeight() - 10f;
+        float yTop  = PAGE_H - 10f;
 
         try {
             java.net.URL logoUrl = PdfLabelGenerator.class.getResource("/logo.jpg");
@@ -38,7 +43,7 @@ public class PdfLabelGenerator {
                 logo.setAbsolutePosition(xLeft, yTop - 30f);
                 document.add(logo);
             }
-        } catch (Exception e) { /* Ignora */ }
+        } catch (Exception e) {}
 
         float textX = xLeft + 95f;
         ColumnText.showTextAligned(cb, Element.ALIGN_LEFT,
@@ -53,10 +58,9 @@ public class PdfLabelGenerator {
                 xLeft, yTop - 40f, 0);
 
         Font tituloFont = new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD);
-        Font posFont = new Font(Font.FontFamily.HELVETICA, 10, Font.NORMAL);
-
-        float maxWidth = pageSize.getWidth() - 2f * xLeft;
-        float yPos = yTop - 60f;
+        Font posFont    = new Font(Font.FontFamily.HELVETICA, 10, Font.NORMAL);
+        float maxWidth  = PAGE_W - 2f * xLeft;
+        float yPos      = yTop - 60f;
 
         Phrase posologiaLinha = new Phrase();
         posologiaLinha.add(new Chunk("Posologia: ", tituloFont));
@@ -69,7 +73,7 @@ public class PdfLabelGenerator {
         String data = new SimpleDateFormat("dd/MM/yyyy HH:mm").format(new Date());
         ColumnText.showTextAligned(cb, Element.ALIGN_RIGHT,
                 new Phrase(data, new Font(Font.FontFamily.HELVETICA, 7, Font.ITALIC, BaseColor.GRAY)),
-                pageSize.getWidth() - 10f, 8f, 0);
+                PAGE_W - 10f, 8f, 0);
 
         document.close();
         return arquivoSaida;
@@ -80,66 +84,115 @@ public class PdfLabelGenerator {
                                                  String cliente, String cnpjCliente, String endereco,
                                                  String RG, String telefone, String paciente, String idade,
                                                  List<String> medicamentos, String atendente, String emissor,
-                                                 String caminhoSaida) throws Exception {
+                                                 String caminhoSaida,
+                                                 boolean isEntrega) throws Exception {
 
         String nomeArquivo = "etiqueta_pedido_" + numPedido + "_" +
                 new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".pdf";
         String arquivoSaida = caminhoSaida + File.separator + nomeArquivo;
 
-        // Tamanho da etiqueta
-        Rectangle pageSize = new Rectangle(100f * 2.83f, 50f * 2.83f);
-        float margin = 8f;
-        Document document = new Document(pageSize, margin, margin, margin, margin);
+        // Largura reservada para o barcode na lateral (apenas se for entrega)
+        float barcodeAreaW = isEntrega ? 26f : 0f;
+        float barcodeGap   = isEntrega ? 3f  : 0f;
+
+        // Largura util do conteudo principal
+        float contentW = PAGE_W - (MARGIN * 2) - barcodeAreaW - barcodeGap;
+        float contentH = PAGE_H - (MARGIN * 2);
+
+        Rectangle pageSize = new Rectangle(PAGE_W, PAGE_H);
+
+        // Documento com margens normais — o barcode sera posicionado manualmente
+        Document document = new Document(pageSize, MARGIN, MARGIN, MARGIN, MARGIN);
         PdfWriter writer = PdfWriter.getInstance(document, new FileOutputStream(arquivoSaida));
         document.open();
-
         PdfContentByte cb = writer.getDirectContent();
-        float contentWidth = pageSize.getWidth() - (margin * 2);
 
-        // Fontes
-        Font fontBold = new Font(Font.FontFamily.HELVETICA, 7, Font.BOLD, BaseColor.BLACK);
+        // -------------------------------------------------------
+        // CODIGO DE BARRAS NA LATERAL DIREITA (70% da altura)
+        // -------------------------------------------------------
+        if (isEntrega) {
+            float barcodeLength = PAGE_H * 0.70f; // comprimento = 70% da altura da pagina
+            float barHeight     = barcodeAreaW - 2f;
+
+            Barcode128 barcode = new Barcode128();
+            barcode.setCode(numPedido);
+            barcode.setCodeType(Barcode128.CODE128);
+            barcode.setFont(null);
+            barcode.setBarHeight(barHeight);
+            barcode.setX(0.8f); // largura de cada barra
+
+            // Cria template na orientacao horizontal e depois rotaciona 90 graus
+            PdfTemplate tmpl = cb.createTemplate(barcodeLength, barcodeAreaW);
+            barcode.placeBarcode(tmpl, BaseColor.BLACK, BaseColor.BLACK);
+
+            // Posicao do barcode: canto direito, centralizado verticalmente
+            float barcodeX = PAGE_W - MARGIN - barcodeAreaW;
+            float barcodeY = (PAGE_H - barcodeLength) / 2f;
+
+            // Rotacao 90 graus horario
+            cb.addTemplate(tmpl, 0, 1, -1, 0,
+                    barcodeX + barcodeAreaW,
+                    barcodeY);
+
+            // Linha separadora fina
+            cb.saveState();
+            cb.setLineWidth(0.4f);
+            cb.setColorStroke(new GrayColor(0.75f));
+            cb.moveTo(barcodeX - 2f, MARGIN);
+            cb.lineTo(barcodeX - 2f, PAGE_H - MARGIN);
+            cb.stroke();
+            cb.restoreState();
+        }
+
+        // -------------------------------------------------------
+        // CONTEUDO PRINCIPAL (usando ColumnText para controle preciso)
+        // -------------------------------------------------------
+        Font fontBold   = new Font(Font.FontFamily.HELVETICA, 7, Font.BOLD,   BaseColor.BLACK);
         Font fontNormal = new Font(Font.FontFamily.HELVETICA, 7, Font.NORMAL, BaseColor.BLACK);
-        Font fontSmall = new Font(Font.FontFamily.HELVETICA, 5, Font.NORMAL, BaseColor.BLACK);
+        Font fontSmall  = new Font(Font.FontFamily.HELVETICA, 5, Font.NORMAL, BaseColor.BLACK);
 
-        // Tabela Principal (1 coluna)
+        // Monta o conteudo em uma tabela
         PdfPTable mainTable = new PdfPTable(1);
         mainTable.setWidthPercentage(100);
-        mainTable.setTotalWidth(contentWidth);
+        mainTable.setTotalWidth(contentW);
 
-        // 1. CABEÇALHO
-        addCell(mainTable, "Pedido: " + numPedido + "  " + new SimpleDateFormat("dd/MM/yyyy HH:mm").format(new Date()), fontBold, Element.ALIGN_LEFT);
-        addCell(mainTable, "FARMÁCIA MODELO  -  TANEMIL FARMA LTDA  -  02.893.507/0001-47", fontNormal, Element.ALIGN_LEFT);
-        addCell(mainTable, "AV. REPÚBLICA DO LÍBANO, 1620, ST. OESTE, GOIÂNIA - GO, 74.115-030", fontNormal, Element.ALIGN_LEFT);
+        // Cabecalho
+        String headerTexto = "Pedido: " + numPedido + "  " +
+                new SimpleDateFormat("dd/MM/yyyy HH:mm").format(new Date());
+        addCell(mainTable, headerTexto, fontBold, Element.ALIGN_LEFT);
 
-        addEmptyCell(mainTable, 4f);
+        // Dados da farmacia
+        addCell(mainTable, "FARMACIA MODELO  -  TANEMIL FARMA LTDA  -  02.893.507/0001-47", fontNormal, Element.ALIGN_LEFT);
+        addCell(mainTable, "AV. REPUBLICA DO LIBANO, 1620, ST. OESTE, GOIANIA - GO, 74.115-030", fontNormal, Element.ALIGN_LEFT);
 
-        // 2. DADOS DO CLIENTE
+        addEmptyCell(mainTable, 3f);
+
+        // Dados do cliente
         String line1 = String.format("COMPRADOR: %s  RG: %s  CNPJ/CPF: %s  TEL: %s",
                 safe(cliente), safe(RG), safe(cnpjCliente), safe(telefone));
         addCell(mainTable, line1, fontNormal, Element.ALIGN_LEFT);
         addCell(mainTable, safe(endereco), fontNormal, Element.ALIGN_LEFT);
 
-        String linePac = "PACIENTE: " + safe(paciente).toUpperCase() + "  IDADE: " + safe(idade);
-        addCell(mainTable, linePac, fontBold, Element.ALIGN_LEFT);
+        // Linha divisoria
+        addLinhaDivisoria(mainTable);
 
-        addEmptyCell(mainTable, 4f);
+        // Paciente
+        addCell(mainTable, "PACIENTE: " + safe(paciente).toUpperCase() + "  IDADE: " + safe(idade), fontBold, Element.ALIGN_LEFT);
 
-        // 3. MEDICAMENTOS
+        addEmptyCell(mainTable, 3f);
+
+        // Medicamentos
         for (String med : medicamentos) {
             addCell(mainTable, med, fontBold, Element.ALIGN_LEFT);
         }
 
-        // Espaço antes das assinaturas
-        addEmptyCell(mainTable, 12f);
+        addEmptyCell(mainTable, 10f);
 
-        // 4. ASSINATURAS (Farmacêutico, Atendente e Cliente - LADO A LADO)
-        // 5 colunas: [Linha] [Esp] [Linha] [Esp] [Linha]
+        // Assinaturas
         PdfPTable sigTable = new PdfPTable(5);
-        // Larguras: 32% para cada assinatura (mais curtas para caberem) e 2% de intervalo
         sigTable.setWidths(new float[]{32f, 2f, 32f, 2f, 32f});
         sigTable.setWidthPercentage(100);
 
-        // Configuração do Traço Gráfico (LineSeparator)
         PdfPCell cellLine = new PdfPCell();
         cellLine.setBorder(Rectangle.NO_BORDER);
         LineSeparator ls = new LineSeparator();
@@ -148,51 +201,44 @@ public class PdfLabelGenerator {
         ls.setLineColor(BaseColor.BLACK);
         cellLine.addElement(new Chunk(ls));
 
-        // Célula de Espaço
         PdfPCell cellSpace = new PdfPCell(new Phrase(" "));
         cellSpace.setBorder(Rectangle.NO_BORDER);
 
-        // --- LINHA DE CIMA: TRAÇOS ---
-        sigTable.addCell(cellLine);                 // Traço Farmacêutico
-        sigTable.addCell(cellSpace);                // Espaço
-        sigTable.addCell(new PdfPCell(cellLine));   // Traço Atendente
-        sigTable.addCell(cellSpace);                // Espaço
-        sigTable.addCell(new PdfPCell(cellLine));   // Traço Cliente
+        sigTable.addCell(cellLine);
+        sigTable.addCell(cellSpace);
+        sigTable.addCell(new PdfPCell(cellLine));
+        sigTable.addCell(cellSpace);
+        sigTable.addCell(new PdfPCell(cellLine));
 
-        // --- LINHA DE BAIXO: NOMES ---
-        addCell(sigTable, "FARMACÊUTICO(A)", fontNormal, Element.ALIGN_CENTER);
-        addCell(sigTable, " ", fontNormal, Element.ALIGN_CENTER);
-        // Limita tamanho do nome do atendente se necessário
-        addCell(sigTable, safe(atendente), fontNormal, Element.ALIGN_CENTER);
-        addCell(sigTable, " ", fontNormal, Element.ALIGN_CENTER);
-        // AQUI ESTÁ A ALTERAÇÃO: APENAS PRIMEIRO NOME DO CLIENTE
+        addCell(sigTable, "FARMACEUTICO(A)", fontNormal, Element.ALIGN_CENTER);
+        addCell(sigTable, " ",              fontNormal, Element.ALIGN_CENTER);
+        addCell(sigTable, safe(atendente),  fontNormal, Element.ALIGN_CENTER);
+        addCell(sigTable, " ",              fontNormal, Element.ALIGN_CENTER);
         addCell(sigTable, primeiroNome(safe(cliente)), fontNormal, Element.ALIGN_CENTER);
 
-        // Adiciona bloco de assinaturas na tabela principal
         PdfPCell sigCell = new PdfPCell(sigTable);
         sigCell.setBorder(Rectangle.NO_BORDER);
         mainTable.addCell(sigCell);
 
-        addEmptyCell(mainTable, 8f);
+        addEmptyCell(mainTable, 6f);
 
-        // 5. AVISO LEGAL (Rodapé)
-        addCell(mainTable, "É VEDADA A DEVOLUÇÃO DESTE(S) MEDICAMENTO(S) SEGUNDO A LEGISLAÇÃO VIGENTE.", fontSmall, Element.ALIGN_CENTER);
+        // Aviso legal
+        addCell(mainTable, "E VEDADA A DEVOLUCAO DESTE(S) MEDICAMENTO(S) SEGUNDO A LEGISLACAO VIGENTE.", fontSmall, Element.ALIGN_CENTER);
 
-        // --- RENDERIZAÇÃO E ESCALA ---
+        // Renderiza a tabela diretamente no canvas na posicao correta
+        // sem escalonamento — a tabela e desenhada em tamanho real
         float tableHeight = mainTable.calculateHeights();
-        float availableHeight = pageSize.getHeight() - (margin * 2);
 
-        if (tableHeight > availableHeight) {
-            float scale = availableHeight / tableHeight;
-            PdfContentByte canvas = writer.getDirectContent();
-            PdfTemplate template = canvas.createTemplate(pageSize.getWidth() - (margin * 2), tableHeight);
-
+        // Se o conteudo for maior que o disponivel, escala apenas o suficiente
+        if (tableHeight > contentH) {
+            float scale = contentH / tableHeight;
+            PdfTemplate template = cb.createTemplate(contentW, tableHeight);
             mainTable.writeSelectedRows(0, -1, 0, tableHeight, template);
-
-            // Adiciona o template escalonado
-            canvas.addTemplate(template, scale, 0, 0, scale, margin, margin);
+            cb.addTemplate(template, scale, 0, 0, scale, MARGIN, MARGIN);
         } else {
-            document.add(mainTable);
+            // Posiciona o conteudo no topo da area util
+            float yStart = PAGE_H - MARGIN;
+            mainTable.writeSelectedRows(0, -1, MARGIN, yStart, cb);
         }
 
         document.close();
@@ -215,21 +261,35 @@ public class PdfLabelGenerator {
         table.addCell(cell);
     }
 
+    private static void addLinhaDivisoria(PdfPTable table) {
+        LineSeparator ls = new LineSeparator();
+        ls.setLineWidth(1.2f);
+        ls.setPercentage(100);
+        ls.setLineColor(BaseColor.BLACK);
+
+        PdfPCell cell = new PdfPCell();
+        cell.setBorder(Rectangle.NO_BORDER);
+        cell.setPaddingTop(2f);
+        cell.setPaddingBottom(3f);
+        cell.addElement(new Chunk(ls));
+        table.addCell(cell);
+    }
+
     private static String safe(String s) {
         return s == null ? "" : s;
     }
 
-    // Extrai apenas o primeiro nome
     private static String primeiroNome(String nome) {
         if (nome == null || nome.trim().isEmpty()) return "";
         return nome.trim().split("\\s+")[0];
     }
 
-    // --- IMPRESSÃO ---
+    // --- IMPRESSAO ---
     public static void imprimirArquivo(String caminhoArquivo, String nomeImpressora) {
         try {
-            if (nomeImpressora == null || nomeImpressora.trim().isEmpty() || nomeImpressora.equalsIgnoreCase("Nome_Da_Impressora_Aqui")) {
-                JOptionPane.showMessageDialog(null, "⚠️ Nome da impressora não configurado!\nAbrindo arquivo manualmente...");
+            if (nomeImpressora == null || nomeImpressora.trim().isEmpty() ||
+                    nomeImpressora.equalsIgnoreCase("Nome_Da_Impressora_Aqui")) {
+                JOptionPane.showMessageDialog(null, "Nome da impressora nao configurado!\nAbrindo arquivo manualmente...");
                 java.awt.Desktop.getDesktop().open(new File(caminhoArquivo));
                 return;
             }
@@ -242,7 +302,7 @@ public class PdfLabelGenerator {
                 }
             }
             if (impressoraSelecionada == null) {
-                JOptionPane.showMessageDialog(null, "❌ Impressora não encontrada: " + nomeImpressora);
+                JOptionPane.showMessageDialog(null, "Impressora nao encontrada: " + nomeImpressora);
                 java.awt.Desktop.getDesktop().open(new File(caminhoArquivo));
                 return;
             }
@@ -250,7 +310,7 @@ public class PdfLabelGenerator {
             try (FileInputStream fis = new FileInputStream(caminhoArquivo)) {
                 Doc doc = new SimpleDoc(fis, DocFlavor.INPUT_STREAM.AUTOSENSE, null);
                 job.print(doc, null);
-                JOptionPane.showMessageDialog(null, "✅ Enviado para impressora: " + nomeImpressora);
+                JOptionPane.showMessageDialog(null, "Enviado para impressora: " + nomeImpressora);
             }
         } catch (Exception e) {
             e.printStackTrace();
